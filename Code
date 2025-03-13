@@ -1,0 +1,228 @@
+pip install pygame
+pip install numpy
+pip install sys
+pip install time
+pip install random
+
+import pygame
+import numpy as np
+import sys
+import time
+import random
+
+# Initialize pygame
+pygame.init()
+
+# Constants
+WIDTH, HEIGHT = 600, 600
+LINE_WIDTH = 10
+BOARD_ROWS, BOARD_COLS = 3, 3
+SQUARE_SIZE = WIDTH // BOARD_COLS
+CIRCLE_RADIUS = SQUARE_SIZE // 3
+CIRCLE_WIDTH = 10
+CROSS_WIDTH = 15
+SPACE = SQUARE_SIZE // 4
+FONT = pygame.font.Font(None, 80)
+
+# Colors
+BG_COLOR = (28, 170, 156)
+LINE_COLOR = (23, 145, 135)
+CIRCLE_COLOR = (239, 231, 200)
+CROSS_COLOR = (66, 66, 66)
+HIGHLIGHT_COLOR = (255, 0, 0)
+TEXT_COLOR = (255, 255, 255)
+
+# Players
+PLAYER_X = 'X'
+PLAYER_O = 'O'
+
+# Difficulty
+DIFFICULTY = "Hard"  # Change to "Easy", "Medium", or "Hard"
+
+# Initialize screen
+screen = pygame.display.set_mode((WIDTH, HEIGHT))
+pygame.display.set_caption("Tic-Tac-Toe")
+screen.fill(BG_COLOR)
+
+# Create board
+board = np.full((BOARD_ROWS, BOARD_COLS), ' ')
+
+# Draw grid lines
+def draw_lines():
+    for i in range(1, BOARD_ROWS):
+        pygame.draw.line(screen, LINE_COLOR, (0, i * SQUARE_SIZE), (WIDTH, i * SQUARE_SIZE), LINE_WIDTH)
+        pygame.draw.line(screen, LINE_COLOR, (i * SQUARE_SIZE, 0), (i * SQUARE_SIZE, HEIGHT), LINE_WIDTH)
+
+draw_lines()
+
+# Draw X and O
+def draw_figures():
+    for row in range(BOARD_ROWS):
+        for col in range(BOARD_COLS):
+            if board[row, col] == PLAYER_O:
+                pygame.draw.circle(screen, CIRCLE_COLOR, 
+                                   (int(col * SQUARE_SIZE + SQUARE_SIZE // 2), 
+                                    int(row * SQUARE_SIZE + SQUARE_SIZE // 2)), 
+                                   CIRCLE_RADIUS, CIRCLE_WIDTH)
+            elif board[row, col] == PLAYER_X:
+                start_x = col * SQUARE_SIZE + SPACE
+                start_y = row * SQUARE_SIZE + SPACE
+                end_x = (col + 1) * SQUARE_SIZE - SPACE
+                end_y = (row + 1) * SQUARE_SIZE - SPACE
+                pygame.draw.line(screen, CROSS_COLOR, (start_x, start_y), (end_x, end_y), CROSS_WIDTH)
+                pygame.draw.line(screen, CROSS_COLOR, (start_x, end_y), (end_x, start_y), CROSS_WIDTH)
+
+# Display win/loss messages with animations
+def display_message(text):
+    alpha = 0
+    text_surface = FONT.render(text, True, TEXT_COLOR)
+    text_rect = text_surface.get_rect(center=(WIDTH // 2, HEIGHT // 2))
+
+    # Fade in effect
+    for alpha in range(0, 255, 15):
+        screen.fill(BG_COLOR)
+        draw_lines()
+        draw_figures()
+        text_surface.set_alpha(alpha)
+        screen.blit(text_surface, text_rect)
+        pygame.display.update()
+        pygame.time.delay(50)
+
+    pygame.time.delay(2000)  # Show message for 2 seconds
+
+    # Fade out effect
+    for alpha in range(255, -1, -15):
+        screen.fill(BG_COLOR)
+        draw_lines()
+        draw_figures()
+        text_surface.set_alpha(alpha)
+        screen.blit(text_surface, text_rect)
+        pygame.display.update()
+        pygame.time.delay(50)
+
+# Check winner and return winning positions
+def check_winner(player):
+    for i in range(3):
+        if all(board[i, :] == player):
+            return [(i, 0), (i, 1), (i, 2)]
+        if all(board[:, i] == player):
+            return [(0, i), (1, i), (2, i)]
+    
+    if all(np.diag(board) == player):
+        return [(0, 0), (1, 1), (2, 2)]
+    if all(np.diag(np.fliplr(board)) == player):
+        return [(0, 2), (1, 1), (2, 0)]
+    
+    return None
+
+# AI move logic
+def ai_move():
+    empty_cells = [(i, j) for i in range(3) for j in range(3) if board[i, j] == ' ']
+
+    if DIFFICULTY == "Easy":
+        move = random.choice(empty_cells)
+    elif DIFFICULTY == "Medium":
+        move = random.choice(empty_cells) if random.random() < 0.5 else best_move_hard()
+    else:
+        move = best_move_hard()
+
+    board[move] = PLAYER_O
+
+# Minimax for best AI move
+def minimax(board, depth, is_maximizing):
+    if check_winner(PLAYER_O):
+        return 1
+    if check_winner(PLAYER_X):
+        return -1
+    if ' ' not in board:
+        return 0
+
+    if is_maximizing:
+        best_score = -np.inf
+        for i, j in [(x, y) for x in range(3) for y in range(3) if board[x, y] == ' ']:
+            board[i, j] = PLAYER_O
+            score = minimax(board, depth + 1, False)
+            board[i, j] = ' '
+            best_score = max(score, best_score)
+        return best_score
+    else:
+        best_score = np.inf
+        for i, j in [(x, y) for x in range(3) for y in range(3) if board[x, y] == ' ']:
+            board[i, j] = PLAYER_X
+            score = minimax(board, depth + 1, True)
+            board[i, j] = ' '
+            best_score = min(score, best_score)
+        return best_score
+
+# Best AI move
+def best_move_hard():
+    best_score = -np.inf
+    best_move = None
+
+    for i, j in [(x, y) for x in range(3) for y in range(3) if board[x, y] == ' ']:
+        board[i, j] = PLAYER_O
+        score = minimax(board, 0, False)
+        board[i, j] = ' '
+        if score > best_score:
+            best_score = score
+            best_move = (i, j)
+
+    return best_move
+
+# Reset board
+def reset_board():
+    global board
+    board = np.full((3, 3), ' ')
+    screen.fill(BG_COLOR)
+    draw_lines()
+
+# Main game loop
+player_turn = True
+game_over = False
+running = True
+
+while running:
+    for event in pygame.event.get():
+        if event.type == pygame.QUIT:
+            running = False
+
+        if event.type == pygame.MOUSEBUTTONDOWN and not game_over:
+            x, y = event.pos
+            row, col = y // SQUARE_SIZE, x // SQUARE_SIZE
+
+            if board[row, col] == ' ' and player_turn:
+                board[row, col] = PLAYER_X
+                player_turn = False
+
+                if check_winner(PLAYER_X):
+                    display_message("You Win!")
+                    game_over = True
+
+                elif ' ' not in board:
+                    display_message("It's a Draw!")
+                    game_over = True
+
+        if not player_turn and not game_over:
+            time.sleep(0.5)
+            ai_move()
+            player_turn = True
+
+            if check_winner(PLAYER_O):
+                msg = random.choice(["You Lose!", "Better Luck Next Time!"])
+                display_message(msg)
+                game_over = True
+
+            elif ' ' not in board:
+                display_message("It's a Draw!")
+                game_over = True
+
+        if game_over:
+            reset_board()
+            game_over = False
+            player_turn = True
+
+    draw_figures()
+    pygame.display.update()
+
+pygame.quit()
+
